@@ -14,34 +14,27 @@ export const handler = async (event) => {
     const r = await fetch(url, { headers: { 'X-API-KEY': KEY } });
     const data = await r.json();
 
-    const people = (data?.results || []).map(item => {
-      const p = item; // OpenStates result
-      // Normalize for our cards
-      const office = p.current_role?.title || p.current_role?.jurisdiction?.name || 'Legislator';
-      const districtName = p.current_role?.district || '';
-      const party = (p.parties && p.parties[0]?.name) || p.party || '';
-      const email = (p.contact_details || []).find(c => c.type==='email')?.value || p.email || '';
-      const phone = (p.contact_details || []).find(c => c.type==='voice')?.value || p.phone || '';
-      const website = (p.links && p.links[0]?.url) || '';
+    const people = (data?.results || []).map(p => {
+
+      // THIS IS THE SNIPPET
+      let office = p.current_role?.title?.trim()
+        || p.current_role?.jurisdiction?.name
+        || 'Elected Official';
+
+      const districtName = p.current_role?.district?.trim() || '';
+
       return {
         name: p.name,
-        office,
-        party,
-        district_name: districtName,
-        email, phone, website,
+        office,                              // e.g., "State Senator"
+        party: (p.parties && p.parties[0]?.name) || p.party || '',
+        district_name: districtName,         // e.g., "District 12" or "Ward 3"
+        email: (p.contact_details || []).find(c => c.type==='email')?.value || p.email || '',
+        phone: (p.contact_details || []).find(c => c.type==='voice')?.value || p.phone || '',
+        website: (p.links && p.links[0]?.url) || '',
         photo_url: p.image || '',
         sources: (p.sources||[]).map(s=>s.url)
       };
     });
-// Prefer the specific role title, then add district if present
-let office = p.current_role?.title?.trim() 
-  || p.current_role?.jurisdiction?.name 
-  || 'Elected Official';
-const districtName = p.current_role?.district?.trim() || '';
-if (districtName) {
-  office = `${office} – ${districtName}`;
-}
-const party = (p.parties && p.parties[0]?.name) || p.party || '';
 
     return json({ ok:true, people });
   } catch (e) {
