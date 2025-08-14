@@ -100,4 +100,63 @@
     return div;
   }
 </script>
+<script>
+  function card(person){
+    // 1) Build a base office label from the most specific fields we might get
+    let baseTitle =
+      (person.office && person.office.trim()) ||
+      (person.title && person.title.trim()) ||
+      (person.role && person.role.trim()) ||
+      'Elected Official';
+
+    // 2) If the provider sent something generic, infer a better title from context
+    const isGeneric = /Elected\s+(Official|Representative)/i.test(baseTitle);
+
+    if (isGeneric) {
+      const email = (person.email || '').toLowerCase();
+      const site  = (person.website || '').toLowerCase();
+
+      if (/councilmember|council\.|\/council\//.test(email) || /\/council\//.test(site)) {
+        baseTitle = 'Council Member';
+      } else if (/sheriff/.test(email) || /sheriff/.test(site)) {
+        baseTitle = 'Sheriff';
+      } else if (/register/.test(site) && /wills/.test(site)) {
+        baseTitle = 'Register of Wills';
+      } else if (/orphans/.test(site)) {
+        baseTitle = "Orphans' Court Judge";
+      } else if (/stateattorney|statesattorney|sa\.|mdsaa/.test(email+site)) {
+        baseTitle = "State’s Attorney";
+      } else if (/clerk/.test(site) && /circuit/.test(site)) {
+        baseTitle = "Clerk of the Circuit Court";
+      } else if (/board/.test(site) && /education|schools/.test(site)) {
+        baseTitle = "Board of Education Member";
+      }
+      // You can extend these heuristics anytime.
+    }
+
+    // 3) Append district if we have it
+    const label = person.district_name
+      ? `${baseTitle} – ${person.district_name}`
+      : baseTitle;
+
+    // 4) Render
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `
+      <div class="row2">
+        <img class="photo" src="${person.photo_url || ''}" alt="">
+        <div>
+          <div class="title">${person.name || ''}</div>
+          <div class="small">${label} ${person.party ? `<span class="pill">${person.party}</span>` : ''}</div>
+        </div>
+      </div>
+      <div class="small" style="margin-top:8px">
+        ${person.email ? `Email: <a href="mailto:${person.email}">${person.email}</a><br>`:''}
+        ${person.phone ? `Phone: <a href="tel:${person.phone}">${person.phone}</a><br>`:''}
+        ${person.website ? `Web: <a href="${person.website}" target="_blank" rel="noopener">Visit</a>`:''}
+      </div>
+    `;
+    return div;
+  }
+</script>
 
