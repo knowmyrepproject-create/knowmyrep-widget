@@ -1,5 +1,26 @@
 // netlify/functions/state.js
 import fetch from 'node-fetch';
+const people = (data?.results || []).map(p => {
+  // Prefer specific role title
+  let office = p?.current_role?.title?.trim()
+    || p?.current_role?.org_classification?.trim()   // e.g., "upper", "lower" (not ideal, but a clue)
+    || p?.current_role?.jurisdiction?.name?.trim()
+    || 'Elected Official';
+
+  const districtName = p?.current_role?.district?.trim() || '';
+
+  return {
+    name: p?.name || '',
+    office,                               // e.g., "State Senator"
+    party: (p?.parties && p.parties[0]?.name) || p?.party || '',
+    district_name: districtName,          // e.g., "District 12" or "Ward 3"
+    email: (p?.contact_details || []).find(c => c.type === 'email')?.value || p?.email || '',
+    phone: (p?.contact_details || []).find(c => c.type === 'voice')?.value || p?.phone || '',
+    website: (p?.links && p.links[0]?.url) || '',
+    photo_url: p?.image || '',
+    sources: (p?.sources || []).map(s => s.url)
+  };
+});
 
 export const handler = async (event) => {
   try {
