@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KnowMyRep – Find Your Representatives</title>
+  <style>
+    body {font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial; background:#f7f7f8; margin:0; padding:24px; color:#111;}
+    .wrap {max-width: 780px; margin: 0 auto;}
+    .box {background:#fff; border-radius:16px; padding:24px; box-shadow: 0 10px 24px rgba(0,0,0,0.05);}
+    h1 {font-size: 28px; margin:0 0 12px;}
+    p.note {color:#555; margin:8px 0 16px;}
+    .row {display:flex; gap:12px;}
+    input[type=text]{flex:1; padding:14px 16px; font-size:16px; border:1px solid #ddd; border-radius:12px;}
+    button{padding:14px 18px; font-size:16px; border:0; border-radius:12px; cursor:pointer; background:#121212; color:#fff;}
+    .grid {display:grid; grid-template-columns: repeat(auto-fill,minmax(260px,1fr)); gap:14px; margin-top:18px;}
+    .card{border:1px solid #eee; border-radius:14px; padding:14px; background:#fff}
+    .title{font-weight:600; margin:8px 0 4px}
+    .small{font-size:13px; color:#555}
+    .photo{width:64px; height:64px; border-radius:8px; object-fit:cover; background:#eee}
+    .row2{display:flex; gap:12px; align-items:center}
+    .pill{display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; background:#f0f0f0; margin-left:6px}
+    .links a{font-size:13px; color:#0b57d0; text-decoration:none; margin-right:10px}
+    .links a:hover{text-decoration:underline}
+    .section{margin-top:24px}
+    .hr{height:1px; background:#eee; margin:18px 0}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="box">
+      <h1>KnowMyRep – Find Your Representatives</h1>
+      <p class="note">Enter your full street address (e.g., “1600 Pennsylvania Ave NW, Washington, DC 20500”).</p>
+      <div class="row">
+        <input id="addr" type="text" placeholder="Your address…" />
+        <button id="go">Look up</button>
+      </div>
+
+      <div id="status" class="section"></div>
+
+      <div class="section">
+        <h3>State Legislature</h3>
+        <div id="stateGrid" class="grid"></div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="section">
+        <h3>Next Up (links while we expand):</h3>
+        <div id="links" class="links small">
+          <!-- Filled after geocode: House finder (by ZIP), Senators (by state), and directories for local -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const stateGrid = document.getElementById('stateGrid');
+    const linksEl = document.getElementById('links');
+
+    function setStatus(msg){ statusEl.textContent = msg; }
+
+    function card(person){
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.innerHTML = `
+        <div class="row2">
+          <img class="photo" src="${person.photo_url || ''}" alt="">
+          <div>
+            <div class="title">${person.name}</div>
+            <div class="small">${person.office} <span class="pill">${person.party || 'Nonpartisan'}</span></div>
+            <div class="small">${person.district_name || ''}</div>
+          </div>
+        </div>
+        <div class="small" style="margin-top:8px">
+          ${person.email ? `Email: <a href="mailto:${person.email}">${person.email}</a><br>`:''}
+          ${person.phone ? `Phone: <a href="tel:${person.phone}">${person.phone}</a><br>`:''}
+          ${person.website ? `Website: <a href="${person.website}" target="_blank" rel="noopener">Visit</a>`:''}
+        </div>
+      `;
+      return div;
+    }
+
+    async function lookup(){
+      stateGrid.innerHTML = '';
+      linksEl.innerHTML = '';
+      const addr = document.getElementById('addr').value.trim();
+      if(!addr){ setStatus('Please enter a full street address.'); return; }
+      setStatus('Looking up your location…');
+
+      // 1) Geocode via our Netlify function
+      const geoRes = await fetch('/.netlify/functions/geocode?address='+encodeURIComponent(addr));
+      const geo = await geoRes.json();
+      if(!geo.ok){ setStatus(geo.error || 'Could not geocode address.'); return; }
+      setStatus('Found your location. Getting your state representatives…');
+
+      // 2) State legislators (OpenStates via our function)
+      const stRes = await fetch('/.netlify/functions/state?lat='+geo.lat+'&lon='+geo.lon);
+      const stateData = await stRes.json();
+      if(stateData.people && stateData.people.length){
+        stateData.people.forEach(p => stateGrid.appendChild(card(p)));
+      }else{
+        stateGrid.innerHTML = '<div class="small">No state legislators found.</div>';
+      }
+
+      // 3) Convenience links for the rest (no keys needed)
+      const zip = geo.zip || '';
+      const state = geo.state || '';
+      const county = geo.county || '';
+      const place = geo.place || '';
+
+      const houseLink = zip ? `https://www.house.gov/representatives/find-your-representative?zip=${encodeURIComponent(zip)}` : 'https://www.house.gov/representatives/find-your-representative';
+      const senateLink = state ? `https://www.senate.gov/senators/senators-contact.htm` : `https://www.senate.gov/senators/senators-contact.htm`;
+      linksEl.innerHTML = `
+        <a target="_blank" rel="noopener" href="${houseLink}">Find your U.S. House member</a>
+        <a target="_blank" rel="noopener" href="${senateLink}">Find your U.S. Senators</a>
+        ${
+          state === 'MD'
+          ? `<a target="_blank" rel="noopener" href="https://msa.maryland.gov/msa/mdmanual/36loc/html/loc.html">Maryland local directory (county/municipal)</a>
+             <a target="_blank" rel="noopener" href="https://registers.maryland.gov/main/">Registers of Wills (MD)</a>
+             <a target="_blank" rel="noopener" href="https://www.mdcourts.gov/judgesprofiles#orphans">Orphans’ Court (MD)</a>`
+          : ''
+        }
+      `;
+
+      setStatus('Done.');
+    }
+
+    document.getElementById('go').addEventListener('click', lookup);
+    document.getElementById('addr').addEventListener('keydown', (e)=>{ if(e.key==='Enter') lookup(); });
+  </script>
+</body>
+</html>
