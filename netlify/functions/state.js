@@ -33,6 +33,15 @@ export const handler = async (event) => {
         sources: (p.sources||[]).map(s=>s.url)
       };
     });
+// Prefer the specific role title, then add district if present
+let office = p.current_role?.title?.trim() 
+  || p.current_role?.jurisdiction?.name 
+  || 'Elected Official';
+const districtName = p.current_role?.district?.trim() || '';
+if (districtName) {
+  office = `${office} – ${districtName}`;
+}
+const party = (p.parties && p.parties[0]?.name) || p.party || '';
 
     return json({ ok:true, people });
   } catch (e) {
